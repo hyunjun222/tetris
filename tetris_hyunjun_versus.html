@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>현준이의 테트리스 · VERSUS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#10091f; --panel:#1a1130; --line:#3a2a5c; --grid:#150c28;
+    --dim:#9a8bc4; --white:#f3eeff; --accent:#ff5fb0; --accent2:#38e6c5;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;min-height:100%;
+    background:
+      radial-gradient(circle at 20% 10%, #2a1750 0%, transparent 55%),
+      radial-gradient(circle at 85% 90%, #10233f 0%, transparent 50%),
+      var(--bg);
+    color:var(--white);
+    font-family:'JetBrains Mono',monospace;
+    -webkit-font-smoothing:antialiased;
+  }
+  .stage{min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:22px 14px;}
+  .app{display:flex;flex-direction:column;gap:14px;width:100%;max-width:860px;}
+  .title{
+    font-family:'Press Start 2P',monospace;font-size:18px;letter-spacing:2px;
+    text-align:center;line-height:1.9;
+    background:linear-gradient(90deg,var(--accent),#ffd23f 45%,var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 12px rgba(255,95,176,.25));
+  }
+  .title span{color:var(--dim);font-size:9px;display:block;letter-spacing:4px;margin-top:8px;-webkit-text-fill-color:var(--dim);filter:none;}
+
+  /* lobby */
+  .lobby{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:12px;}
+  .lobby .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .lobby h3{margin:0;font-size:12px;letter-spacing:2px;color:var(--accent2);text-transform:uppercase;}
+  .lobby p{margin:0;font-size:11px;color:var(--dim);line-height:1.6;}
+  input.code{
+    flex:1;min-width:150px;background:var(--grid);border:1px solid var(--line);border-radius:4px;
+    color:var(--white);font-family:'JetBrains Mono',monospace;padding:9px 10px;font-size:12px;letter-spacing:1px;
+  }
+  .btn{
+    font-family:'JetBrains Mono',monospace;font-weight:700;border:none;border-radius:4px;
+    padding:9px 16px;font-size:12px;letter-spacing:1px;cursor:pointer;text-transform:uppercase;
+    background:linear-gradient(90deg,var(--accent),#ff8fc7);color:#150c28;
+  }
+  .btn.alt{background:linear-gradient(90deg,var(--accent2),#7defd8);}
+  .btn.ghost{background:transparent;color:var(--white);border:1px solid var(--line);}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .linkbox{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .linkbox code{flex:1;min-width:180px;background:var(--grid);border:1px solid var(--line);border-radius:4px;padding:9px 10px;font-size:11px;color:var(--accent2);word-break:break-all;}
+  .status{font-size:11px;letter-spacing:1px;}
+  .status .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dim);margin-right:6px;vertical-align:middle;}
+  .status.on .dot{background:var(--accent2);box-shadow:0 0 8px var(--accent2);}
+
+  /* arena */
+  .arena{display:flex;gap:16px;justify-content:center;align-items:flex-start;flex-wrap:wrap;}
+  .side{display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .side .who{font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:1px;}
+  .me .who{color:var(--accent);}
+  .op .who{color:var(--accent2);}
+  .play{display:flex;gap:12px;align-items:flex-start;}
+  .board-wrap{position:relative;border:2px solid var(--accent2);border-radius:6px;background:var(--grid);line-height:0;box-shadow:0 0 24px rgba(56,230,197,.15),inset 0 0 30px rgba(0,0,0,.5);}
+  .me .board-wrap{border-color:var(--accent);box-shadow:0 0 24px rgba(255,95,176,.15),inset 0 0 30px rgba(0,0,0,.5);}
+  canvas{display:block;image-rendering:pixelated;}
+  .overlay{position:absolute;inset:0;background:rgba(16,9,31,.92);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:16px;border-radius:4px;}
+  .overlay.show{display:flex;}
+  .overlay h2{font-family:'Press Start 2P',monospace;font-size:12px;letter-spacing:2px;margin:0;color:var(--accent);}
+  .overlay p{margin:0;font-size:11px;color:var(--dim);line-height:1.7;}
+  .panel{width:96px;display:flex;flex-direction:column;gap:8px;}
+  .box{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:8px 9px;}
+  .box .label{font-size:8px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;}
+  .box .value{font-size:16px;font-weight:700;margin-top:3px;letter-spacing:1px;color:var(--accent2);}
+  .mini{display:flex;align-items:center;justify-content:center;padding:6px 0 2px;}
+  .op-stats{display:flex;gap:8px;}
+  .op-stats .box{flex:1;text-align:center;}
+
+  .controls-list{display:flex;flex-direction:column;gap:5px;font-size:10.5px;color:var(--dim);border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:10px 12px;}
+  .controls-list b{color:var(--white);display:inline-block;width:60px;}
+  .footer-note{text-align:center;font-size:9.5px;color:var(--dim);letter-spacing:1px;}
+  .touch-controls{display:none;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .touch-controls button{font-family:'JetBrains Mono',monospace;background:var(--panel);color:var(--white);border:1px solid var(--line);border-radius:4px;padding:10px 14px;font-size:12px;min-width:50px;}
+  .touch-controls button.wide{min-width:74px;color:var(--accent);}
+  @media (max-width:720px){
+    .arena{gap:10px;}
+    .op .panel{display:none;}
+    .touch-controls{display:flex;}
+    .controls-list{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="app">
+    <div class="title">현준이의 테트리스<span>HYUNJUN'S TETRIS — VERSUS MODE</span></div>
+
+    <!-- LOBBY -->
+    <div class="lobby" id="lobby">
+      <h3>대결 로비</h3>
+      <div class="status" id="netStatus"><span class="dot"></span><span id="netText">준비됨 — 혼자 연습하거나 방을 만들어 초대하세요</span></div>
+      <div class="row">
+        <button class="btn" id="createBtn">방 만들기</button>
+        <button class="btn ghost" id="soloBtn">혼자 연습</button>
+      </div>
+      <div class="linkbox" id="linkArea" style="display:none;">
+        <code id="shareLink"></code>
+        <button class="btn alt" id="copyBtn">링크 복사</button>
+      </div>
+      <div class="row">
+        <input class="code" id="joinInput" placeholder="초대 코드 붙여넣기 (또는 링크의 # 뒤 부분)">
+        <button class="btn alt" id="joinBtn">참여하기</button>
+      </div>
+      <div class="row" id="startRow" style="display:none;">
+        <button class="btn" id="startBtn">게임 시작</button>
+        <span class="status" id="matchHint" style="color:var(--dim);"></span>
+      </div>
+      <p id="lobbyHelp">두 명이 각자 브라우저에서 이 페이지를 열고, 한 명이 "방 만들기" 후 링크(또는 코드)를 상대에게 보내면 연결됩니다. 온라인 대결은 이 파일을 웹에 올려(HTTPS) 열었을 때 링크가 그대로 열립니다. 로컬 파일(file://)이라면 상대도 같은 파일을 열고 코드를 붙여넣어 참여하세요.</p>
+    </div>
+
+    <!-- ARENA -->
+    <div class="arena">
+      <div class="side me">
+        <div class="who" id="meName">YOU · 현준</div>
+        <div class="play">
+          <div class="board-wrap">
+            <canvas id="board" width="240" height="480"></canvas>
+            <div class="overlay show" id="overlay">
+              <h2 id="overlayTitle">시작 준비</h2>
+              <p id="overlayText">← → 이동 · ↑ 회전 · ↓ 소프트드롭<br>Space 하드드롭 · C 보관/꺼내기 · P 정지</p>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="box"><div class="label">Hold</div><div class="mini"><canvas id="hold" width="60" height="60"></canvas></div></div>
+            <div class="box"><div class="label">Next</div><div class="mini"><canvas id="next" width="60" height="60"></canvas></div></div>
+            <div class="box"><div class="label">Score</div><div class="value" id="score">000000</div></div>
+            <div class="box"><div class="label">Lv</div><div class="value" id="level">01</div></div>
+            <div class="box"><div class="label">Lines</div><div class="value" id="lines">000</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="side op">
+        <div class="who" id="opName">OPPONENT</div>
+        <div class="play">
+          <div class="board-wrap">
+            <canvas id="opBoard" width="180" height="360"></canvas>
+            <div class="overlay" id="opOverlay">
+              <p id="opOverlayText">상대 대기 중…</p>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="box"><div class="label">Score</div><div class="value" id="opScore">000000</div></div>
+            <div class="box"><div class="label">Lines</div><div class="value" id="opLines">000</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="touch-controls">
+      <button id="tLeft">◀</button>
+      <button id="tRotate">⟳</button>
+      <button id="tRight">▶</button>
+      <button id="tDown">▼</button>
+      <button id="tDrop" class="wide">DROP</button>
+      <button id="tHold" class="wide">HOLD</button>
+    </div>
+
+    <div class="controls-list">
+      <div><b>← →</b>이동</div><div><b>↑</b>회전</div><div><b>↓</b>소프트 드롭</div>
+      <div><b>Space</b>하드 드롭</div><div><b>C</b>보관 / 꺼내기</div><div><b>P</b>일시정지</div>
+    </div>
+
+    <div class="footer-note">C키: 보관 중인 게 없으면 저장, 있으면 저장된 블록을 다음 순서 앞에 꺼냄 · 2줄 이상 지우면 상대에게 방해 줄 전송</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const COLS=10, ROWS=20, CELL=24;
+  const board=document.getElementById('board'), ctx=board.getContext('2d');
+  const nextC=document.getElementById('next'), nctx=nextC.getContext('2d');
+  const holdC=document.getElementById('hold'), hctx=holdC.getContext('2d');
+  const opC=document.getElementById('opBoard'), octx=opC.getContext('2d');
+  const OP_CELL=18;
+
+  const overlay=document.getElementById('overlay');
+  const overlayTitle=document.getElementById('overlayTitle');
+  const overlayText=document.getElementById('overlayText');
+  const opOverlay=document.getElementById('opOverlay');
+  const opOverlayText=document.getElementById('opOverlayText');
+
+  const scoreEl=document.getElementById('score'), levelEl=document.getElementById('level'), linesEl=document.getElementById('lines');
+  const opScoreEl=document.getElementById('opScore'), opLinesEl=document.getElementById('opLines');
+
+  const SHAPES={
+    I:[[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],[[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]],[[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]],[[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]],
+    J:[[[1,0,0],[1,1,1],[0,0,0]],[[0,1,1],[0,1,0],[0,1,0]],[[0,0,0],[1,1,1],[0,0,1]],[[0,1,0],[0,1,0],[1,1,0]]],
+    L:[[[0,0,1],[1,1,1],[0,0,0]],[[0,1,0],[0,1,0],[0,1,1]],[[0,0,0],[1,1,1],[1,0,0]],[[1,1,0],[0,1,0],[0,1,0]]],
+    O:[[[1,1],[1,1]],[[1,1],[1,1]],[[1,1],[1,1]],[[1,1],[1,1]]],
+    S:[[[0,1,1],[1,1,0],[0,0,0]],[[0,1,0],[0,1,1],[0,0,1]],[[0,0,0],[0,1,1],[1,1,0]],[[1,0,0],[1,1,0],[0,1,0]]],
+    T:[[[0,1,0],[1,1,1],[0,0,0]],[[0,1,0],[0,1,1],[0,1,0]],[[0,0,0],[1,1,1],[0,1,0]],[[0,1,0],[1,1,0],[0,1,0]]],
+    Z:[[[1,1,0],[0,1,1],[0,0,0]],[[0,0,1],[0,1,1],[0,1,0]],[[0,0,0],[1,1,0],[0,1,1]],[[0,1,0],[1,1,0],[1,0,0]]],
+  };
+  const TYPES=Object.keys(SHAPES);
+  const COLORS={I:'#38e6c5',J:'#5c8dff',L:'#ff9f43',O:'#ffd23f',S:'#4ade80',T:'#c084fc',Z:'#ff5f6d',G:'#5b5570'};
+  const DARK  ={I:'#1c8f7d',J:'#31569e',L:'#a4661f',O:'#a68721',S:'#2c8a53',T:'#7d4fa8',Z:'#a53a44',G:'#332f42'};
+
+  function drawCell(c,px,py,size,type,ghost){
+    const w=size,h=size;c.save();c.translate(px,py);
+    if(ghost){c.strokeStyle=COLORS[type];c.lineWidth=2;c.globalAlpha=.55;c.strokeRect(2,2,w-4,h-4);c.restore();return;}
+    const g=c.createLinearGradient(0,0,w,h);g.addColorStop(0,COLORS[type]);g.addColorStop(1,DARK[type]);
+    c.fillStyle=g;c.fillRect(0,0,w,h);
+    c.fillStyle='rgba(255,255,255,.35)';c.fillRect(1,1,w-2,2);
+    c.fillStyle='rgba(0,0,0,.25)';c.fillRect(1,h-3,w-2,2);
+    c.strokeStyle='rgba(10,6,20,.7)';c.lineWidth=1.5;c.strokeRect(1,1,w-2,h-2);
+    c.restore();
+  }
+  const emptyBoard=()=>Array.from({length:ROWS},()=>Array(COLS).fill(null));
+
+  // ---- seeded RNG + 7-bag (fair pieces across both players) ----
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  let rng=Math.random, bag=[];
+  function refillBag(){const b=[...TYPES];for(let i=b.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[b[i],b[j]]=[b[j],b[i]];}bag=b;}
+  function nextPiece(){if(bag.length===0)refillBag();return bag.pop();}
+
+  // ---- game state ----
+  let grid=emptyBoard(), current, nextType, pos, rot;
+  let holdType=null, holdUsed=false;
+  let dropInterval=800, dropTimer=0, lastTime=0;
+  let running=false, paused=false, gameOver=true;
+  let score=0, level=1, linesCleared=0;
+  let incomingGarbage=0, rafId=null, matchOver=false;
+
+  function spawnFrom(type){
+    current=type;rot=0;pos={x:Math.floor(COLS/2)-2,y:-1};
+    if(SHAPES[current][0].length===3)pos.x=Math.floor(COLS/2)-1;
+    if(collides(current,rot,pos))topOut();
+  }
+  function spawnFromQueue(){const t=nextType;nextType=nextPiece();spawnFrom(t);drawNext();}
+
+  function collides(type,r,p){
+    const s=SHAPES[type][r];
+    for(let y=0;y<s.length;y++)for(let x=0;x<s[y].length;x++){
+      if(!s[y][x])continue;const bx=p.x+x,by=p.y+y;
+      if(bx<0||bx>=COLS||by>=ROWS)return true;
+      if(by>=0&&grid[by][bx])return true;
+    }return false;
+  }
+  function merge(){const s=SHAPES[current][rot];for(let y=0;y<s.length;y++)for(let x=0;x<s[y].length;x++){if(s[y][x]){const by=pos.y+y;if(by>=0)grid[by][pos.x+x]=current;}}}
+
+  function clearLines(){
+    let cleared=0;
+    for(let y=ROWS-1;y>=0;y--){if(grid[y].every(c=>c)){grid.splice(y,1);grid.unshift(Array(COLS).fill(null));cleared++;y++;}}
+    if(cleared>0){
+      score+=[0,100,300,500,800][cleared]*level;
+      linesCleared+=cleared;level=1+Math.floor(linesCleared/10);
+      dropInterval=Math.max(90,800-(level-1)*70);updateHUD();
+      const atk=[0,0,1,2,4][cleared];
+      if(atk>0)net.send({t:'garbage',n:atk});
+    }
+  }
+  function applyIncomingGarbage(){
+    if(incomingGarbage<=0)return;
+    const n=Math.min(incomingGarbage,ROWS);incomingGarbage=0;
+    const hole=Math.floor(Math.random()*COLS);
+    for(let i=0;i<n;i++){grid.shift();const row=Array(COLS).fill('G');row[hole]=null;grid.push(row);}
+    while(collides(current,rot,pos))pos.y--;
+  }
+
+  function updateHUD(){scoreEl.textContent=String(score).padStart(6,'0');levelEl.textContent=String(level).padStart(2,'0');linesEl.textContent=String(linesCleared).padStart(3,'0');}
+
+  function hardDrop(){let d=0;while(!collides(current,rot,{x:pos.x,y:pos.y+1})){pos.y++;d++;}score+=d*2;lockPiece();}
+  function lockPiece(){merge();clearLines();applyIncomingGarbage();spawnFromQueue();holdUsed=false;dropTimer=0;}
+  function tryRotate(){const nr=(rot+1)%4;for(const k of[0,-1,1,-2,2]){const np={x:pos.x+k,y:pos.y};if(!collides(current,nr,np)){rot=nr;pos=np;return;}}}
+  function ghostY(){let gy=pos.y;while(!collides(current,rot,{x:pos.x,y:gy+1}))gy++;return gy;}
+
+  // ---- HOLD: C only. empty→store; full→bring stored out before next ----
+  function doHold(){
+    if(holdUsed)return;holdUsed=true;
+    if(holdType===null){holdType=current;spawnFromQueue();}
+    else{const swap=holdType;holdType=current;spawnFrom(swap);} // stored one comes out now, next stays queued
+    drawHold();draw();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,board.width,board.height);
+    ctx.fillStyle='#150c28';ctx.fillRect(0,0,board.width,board.height);
+    ctx.fillStyle='rgba(255,255,255,.06)';
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){ctx.beginPath();ctx.arc(x*CELL+CELL/2,y*CELL+CELL/2,1,0,7);ctx.fill();}
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(grid[y][x])drawCell(ctx,x*CELL,y*CELL,CELL,grid[y][x],false);
+    if(!gameOver&&current){
+      const gy=ghostY(),s=SHAPES[current][rot];
+      for(let y=0;y<s.length;y++)for(let x=0;x<s[y].length;x++)if(s[y][x])drawCell(ctx,(pos.x+x)*CELL,(gy+y)*CELL,CELL,current,true);
+      for(let y=0;y<s.length;y++)for(let x=0;x<s[y].length;x++)if(s[y][x]&&pos.y+y>=0)drawCell(ctx,(pos.x+x)*CELL,(pos.y+y)*CELL,CELL,current,false);
+    }
+  }
+  function drawMini(c,cv,type){
+    c.clearRect(0,0,cv.width,cv.height);c.fillStyle='#150c28';c.fillRect(0,0,cv.width,cv.height);
+    if(!type)return;const s=SHAPES[type][0],sz=13,w=s[0].length*sz,h=s.length*sz,ox=(cv.width-w)/2,oy=(cv.height-h)/2;
+    for(let y=0;y<s.length;y++)for(let x=0;x<s[y].length;x++)if(s[y][x])drawCell(c,ox+x*sz,oy+y*sz,sz,type,false);
+  }
+  const drawNext=()=>drawMini(nctx,nextC,nextType);
+  const drawHold=()=>drawMini(hctx,holdC,holdType);
+
+  // opponent board render (from received snapshot)
+  function drawOpponent(og){
+    octx.clearRect(0,0,opC.width,opC.height);
+    octx.fillStyle='#150c28';octx.fillRect(0,0,opC.width,opC.height);
+    octx.fillStyle='rgba(255,255,255,.05)';
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){octx.beginPath();octx.arc(x*OP_CELL+OP_CELL/2,y*OP_CELL+OP_CELL/2,.8,0,7);octx.fill();}
+    if(og)for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const t=og[y][x];if(t)drawCell(octx,x*OP_CELL,y*OP_CELL,OP_CELL,t,false);}
+  }
+
+  function renderGrid(){
+    const g=grid.map(r=>r.slice());
+    if(!gameOver&&current){const s=SHAPES[current][rot];for(let y=0;y<s.length;y++)for(let x=0;x<s[y].length;x++){if(s[y][x]&&pos.y+y>=0)g[pos.y+y][pos.x+x]=current;}}
+    return g;
+  }
+
+  // ---- loop ----
+  let lastSent=0;
+  function loop(t){
+    if(!running)return;
+    if(!lastTime)lastTime=t;const dt=t-lastTime;lastTime=t;
+    if(!paused&&!gameOver){
+      dropTimer+=dt;
+      if(dropTimer>dropInterval){dropTimer=0;if(!collides(current,rot,{x:pos.x,y:pos.y+1}))pos.y++;else lockPiece();}
+      draw();
+      if(net.active&&t-lastSent>90){lastSent=t;net.send({t:'state',g:renderGrid(),s:score,l:linesCleared,over:false});}
+    }
+    rafId=requestAnimationFrame(loop);
+  }
+
+  // ---- match control ----
+  function beginMatch(seed){
+    grid=emptyBoard();score=0;level=1;linesCleared=0;dropInterval=800;
+    holdType=null;holdUsed=false;incomingGarbage=0;
+    rng=mulberry32(seed>>>0);bag=[];nextType=nextPiece();
+    gameOver=false;paused=false;running=true;matchOver=false;
+    spawnFromQueue();drawHold();
+    overlay.classList.remove('show');
+    if(net.active){opOverlay.classList.remove('show');}
+    lastTime=0;if(rafId)cancelAnimationFrame(rafId);rafId=requestAnimationFrame(loop);
+  }
+
+  function topOut(){
+    gameOver=true;running=false;matchOver=true;
+    if(net.active){
+      net.send({t:'dead',s:score,l:linesCleared});
+      showResult('YOU LOSE','상대가 승리했습니다',false);
+    }else{
+      overlayTitle.textContent='GAME OVER';
+      overlayText.innerHTML=`최종 점수 <b>${score}</b><br>레벨 ${level} · ${linesCleared}줄`;
+      overlay.classList.add('show');
+    }
+  }
+  function showResult(title,sub,win){
+    overlayTitle.textContent=title;overlayTitle.style.color=win?'#38e6c5':'#ff5f6d';
+    overlayText.innerHTML=`${sub}<br>점수 ${score} · ${linesCleared}줄`;
+    overlay.classList.add('show');running=false;gameOver=true;
+  }
+  function togglePause(){
+    if(gameOver||!running||net.active)return; // 대결 중엔 정지 비활성
+    paused=!paused;
+    if(paused){overlayTitle.textContent='PAUSED';overlayText.textContent='P 키로 계속';overlay.classList.add('show');}
+    else{overlay.classList.remove('show');lastTime=0;}
+  }
+
+  // ---- input ----
+  document.addEventListener('keydown',e=>{
+    if(e.code==='KeyP'){togglePause();return;}
+    if(paused||gameOver||!running)return;
+    switch(e.code){
+      case'ArrowLeft':if(!collides(current,rot,{x:pos.x-1,y:pos.y}))pos.x--;break;
+      case'ArrowRight':if(!collides(current,rot,{x:pos.x+1,y:pos.y}))pos.x++;break;
+      case'ArrowDown':if(!collides(current,rot,{x:pos.x,y:pos.y+1})){pos.y++;score+=1;updateHUD();}else lockPiece();dropTimer=0;break;
+      case'ArrowUp':tryRotate();break;
+      case'Space':e.preventDefault();hardDrop();break;
+      case'KeyC':doHold();break;
+    }
+    draw();
+  });
+  const bind=(id,fn)=>document.getElementById(id).addEventListener('click',()=>{if(paused||gameOver||!running)return;fn();draw();});
+  bind('tLeft',()=>{if(!collides(current,rot,{x:pos.x-1,y:pos.y}))pos.x--;});
+  bind('tRight',()=>{if(!collides(current,rot,{x:pos.x+1,y:pos.y}))pos.x++;});
+  bind('tRotate',()=>tryRotate());
+  bind('tDown',()=>{if(!collides(current,rot,{x:pos.x,y:pos.y+1}))pos.y++;else lockPiece();dropTimer=0;});
+  bind('tDrop',()=>hardDrop());
+  bind('tHold',()=>doHold());
+
+  // ================= NETWORKING (PeerJS) =================
+  const net={peer:null,conn:null,active:false,isHost:false,seed:0,
+    send(obj){if(this.conn&&this.conn.open){try{this.conn.send(obj);}catch(e){}}}};
+
+  const lobby=document.getElementById('lobby');
+  const netStatus=document.getElementById('netStatus'), netText=document.getElementById('netText');
+  const createBtn=document.getElementById('createBtn'), soloBtn=document.getElementById('soloBtn');
+  const joinBtn=document.getElementById('joinBtn'), joinInput=document.getElementById('joinInput');
+  const linkArea=document.getElementById('linkArea'), shareLink=document.getElementById('shareLink'), copyBtn=document.getElementById('copyBtn');
+  const startRow=document.getElementById('startRow'), startBtn=document.getElementById('startBtn'), matchHint=document.getElementById('matchHint');
+  const opName=document.getElementById('opName');
+
+  function setStatus(txt,on){netText.textContent=txt;netStatus.classList.toggle('on',!!on);}
+
+  function bindConn(conn){
+    net.conn=conn;
+    conn.on('open',()=>{
+      net.active=true;setStatus('상대와 연결됨!',true);
+      opOverlayText.textContent='대기 중…';opOverlay.classList.add('show');
+      if(net.isHost){startRow.style.display='flex';matchHint.textContent='당신이 호스트입니다. 시작을 누르세요.';}
+      else{startRow.style.display='flex';startBtn.disabled=true;matchHint.textContent='호스트의 시작을 기다리는 중…';}
+    });
+    conn.on('data',d=>{
+      if(d.t==='state'){drawOpponent(d.g);opScoreEl.textContent=String(d.s).padStart(6,'0');opLinesEl.textContent=String(d.l).padStart(3,'0');}
+      else if(d.t==='garbage'){incomingGarbage+=d.n;}
+      else if(d.t==='start'){net.seed=d.seed;beginMatch(d.seed);lobby.style.display='none';}
+      else if(d.t==='dead'){opOverlayText.textContent='상대 패배';opOverlay.classList.add('show');showResult('YOU WIN','상대가 먼저 무너졌습니다',true);}
+    });
+    conn.on('close',()=>{net.active=false;setStatus('상대 연결 끊김',false);opOverlayText.textContent='연결 끊김';opOverlay.classList.add('show');});
+    conn.on('error',()=>setStatus('연결 오류',false));
+  }
+
+  function ensurePeer(cb){
+    if(typeof Peer==='undefined'){setStatus('네트워크 모듈 로드 실패 — 오프라인이면 혼자 연습만 가능',false);return;}
+    net.peer=new Peer();
+    net.peer.on('open',id=>cb(id));
+    net.peer.on('connection',conn=>{net.isHost=true;bindConn(conn);});
+    net.peer.on('error',err=>{setStatus('P2P 오류: '+(err.type||err),false);});
+  }
+
+  createBtn.addEventListener('click',()=>{
+    createBtn.disabled=true;setStatus('방 생성 중…',false);net.isHost=true;
+    ensurePeer(id=>{
+      const link=location.href.split('#')[0]+'#'+id;
+      shareLink.textContent=link;linkArea.style.display='flex';
+      setStatus('방 생성됨 — 링크/코드를 상대에게 보내세요',true);
+      matchHint.textContent='';
+      // 코드도 join input 에 표시(복사 편의)
+      joinInput.value=id;
+    });
+  });
+
+  joinBtn.addEventListener('click',()=>{
+    let code=joinInput.value.trim();
+    if(code.includes('#'))code=code.split('#').pop();
+    if(!code){setStatus('참여할 코드를 입력하세요',false);return;}
+    net.isHost=false;joinBtn.disabled=true;setStatus('연결 중…',false);
+    ensurePeer(()=>{const conn=net.peer.connect(code,{reliable:true});bindConn(conn);});
+  });
+
+  startBtn.addEventListener('click',()=>{
+    if(!net.active)return;
+    const seed=(Math.random()*2**31)>>>0;
+    net.send({t:'start',seed});
+    beginMatch(seed);lobby.style.display='none';
+  });
+
+  soloBtn.addEventListener('click',()=>{
+    net.active=false;lobby.style.display='none';
+    opName.textContent='OPPONENT (연습 중엔 없음)';
+    beginMatch((Math.random()*2**31)>>>0);
+  });
+
+  copyBtn.addEventListener('click',()=>{
+    navigator.clipboard&&navigator.clipboard.writeText(shareLink.textContent).then(()=>{copyBtn.textContent='복사됨!';setTimeout(()=>copyBtn.textContent='링크 복사',1500);});
+  });
+
+  // 링크로 들어온 경우 코드 자동 채우기
+  if(location.hash.length>1){joinInput.value=location.hash.slice(1);setStatus('초대 코드가 감지됨 — "참여하기"를 누르세요',false);}
+
+  // initial paint
+  draw();drawNext();drawHold();drawOpponent(null);
+})();
+</script>
+</body>
+</html>
