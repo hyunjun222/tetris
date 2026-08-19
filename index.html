@@ -275,7 +275,9 @@
   }
   // V키 공격: 호스트 전용. 상대에게 일반 방해줄 1개 조용히 전송
   function doVAttack(){
-    if(!net.active||!net.isHost||gameOver||!running)return;
+    if(gameOver||!running)return;
+    if(!net.conn||!net.conn.open)return;
+    if(!net.isHost)return;
     net.send({t:'garbage',n:1});
   }
 
@@ -441,7 +443,7 @@
     if(typeof Peer==='undefined'){setStatus('네트워크 모듈 로드 실패 — 오프라인이면 혼자 연습만 가능',false);return;}
     net.peer=new Peer();
     net.peer.on('open',id=>cb(id));
-    net.peer.on('connection',conn=>{net.isHost=true;bindConn(conn);});
+    net.peer.on('connection',conn=>{bindConn(conn);}); // isHost는 createBtn에서만 설정
     net.peer.on('error',err=>{setStatus('P2P 오류: '+(err.type||err),false);});
   }
 
@@ -452,7 +454,6 @@
       shareLink.textContent=link;linkArea.style.display='flex';
       setStatus('방 생성됨 — 링크/코드를 상대에게 보내세요',true);
       matchHint.textContent='';
-      // 코드도 join input 에 표시(복사 편의)
       joinInput.value=id;
     });
   });
@@ -466,7 +467,7 @@
   });
 
   startBtn.addEventListener('click',()=>{
-    if(!net.active)return;
+    if(!net.conn||!net.conn.open)return;
     const seed=(Math.random()*2**31)>>>0;
     net.send({t:'start',seed});
     beginMatch(seed);lobby.style.display='none';
