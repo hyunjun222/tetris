@@ -276,9 +276,9 @@
   // V키 공격: 호스트 전용. 상대에게 일반 방해줄 1개 조용히 전송
   function doVAttack(){
     if(gameOver||!running)return;
-    if(!net.conn||!net.conn.open)return;
     if(!net.isHost)return;
-    net.send({t:'garbage',n:1});
+    if(!net.conn||!net.conn.open)return;
+    net.conn.send({t:'garbage',n:1});
   }
 
   function updateHUD(){scoreEl.textContent=String(score).padStart(6,'0');levelEl.textContent=String(level).padStart(2,'0');linesEl.textContent=String(linesCleared).padStart(3,'0');}
@@ -354,6 +354,11 @@
     spawnFromQueue();drawHold();
     overlay.classList.remove('show');
     if(net.active){opOverlay.classList.remove('show');}
+    // 호스트면 게임 시작 시점에도 V키 UI 확실히 표시
+    if(net.isHost){
+      document.getElementById('vKeyHint').style.display='flex';
+      document.getElementById('tVAttack').style.display='inline-block';
+    }
     lastTime=0;if(rafId)cancelAnimationFrame(rafId);rafId=requestAnimationFrame(loop);
   }
 
