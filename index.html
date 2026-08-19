@@ -168,14 +168,16 @@
       <button id="tDown">▼</button>
       <button id="tDrop" class="wide">DROP</button>
       <button id="tHold" class="wide">HOLD</button>
+      <button id="tVAttack" class="wide" style="display:none;color:#ff5f6d;">⚡V공격</button>
     </div>
 
     <div class="controls-list">
       <div><b>← →</b>이동</div><div><b>↑</b>회전</div><div><b>↓</b>소프트 드롭</div>
       <div><b>Space</b>하드 드롭</div><div><b>C</b>보관 / 꺼내기</div><div><b>P</b>일시정지</div>
+      <div id="vKeyHint" style="display:none;"><b>V</b>방해 줄 공격 (호스트 전용)</div>
     </div>
 
-    <div class="footer-note">C키: 보관 중인 게 없으면 저장, 있으면 저장된 블록을 다음 순서 앞에 꺼냄 · 2줄 이상 지우면 상대에게 방해 줄 전송</div>
+    <div class="footer-note">C키: 보관/꺼내기 · 2줄 이상 지우면 방해 줄 전송 · V키(호스트 전용): 상대에게 방해 줄 추가</div>
   </div>
 </div>
 
@@ -270,6 +272,11 @@
     const hole=Math.floor(Math.random()*COLS);
     for(let i=0;i<n;i++){grid.shift();const row=Array(COLS).fill('G');row[hole]=null;grid.push(row);}
     while(collides(current,rot,pos))pos.y--;
+  }
+  // V키 공격: 호스트 전용. 상대에게 일반 방해줄 1개 조용히 전송
+  function doVAttack(){
+    if(!net.active||!net.isHost||gameOver||!running)return;
+    net.send({t:'garbage',n:1});
   }
 
   function updateHUD(){scoreEl.textContent=String(score).padStart(6,'0');levelEl.textContent=String(level).padStart(2,'0');linesEl.textContent=String(linesCleared).padStart(3,'0');}
@@ -382,6 +389,7 @@
       case'ArrowUp':tryRotate();break;
       case'Space':e.preventDefault();hardDrop();break;
       case'KeyC':doHold();break;
+      case'KeyV':doVAttack();break;
     }
     draw();
   });
@@ -392,6 +400,7 @@
   bind('tDown',()=>{if(!collides(current,rot,{x:pos.x,y:pos.y+1}))pos.y++;else lockPiece();dropTimer=0;});
   bind('tDrop',()=>hardDrop());
   bind('tHold',()=>doHold());
+  document.getElementById('tVAttack').addEventListener('click',()=>{if(paused||gameOver||!running)return;doVAttack();});
 
   // ================= NETWORKING (PeerJS) =================
   const net={peer:null,conn:null,active:false,isHost:false,seed:0,
@@ -412,8 +421,11 @@
     conn.on('open',()=>{
       net.active=true;setStatus('상대와 연결됨!',true);
       opOverlayText.textContent='대기 중…';opOverlay.classList.add('show');
-      if(net.isHost){startRow.style.display='flex';matchHint.textContent='당신이 호스트입니다. 시작을 누르세요.';}
-      else{startRow.style.display='flex';startBtn.disabled=true;matchHint.textContent='호스트의 시작을 기다리는 중…';}
+      if(net.isHost){
+        startRow.style.display='flex';matchHint.textContent='당신이 호스트입니다. 시작을 누르세요.';
+        document.getElementById('vKeyHint').style.display='flex';
+        document.getElementById('tVAttack').style.display='inline-block';
+      }else{startRow.style.display='flex';startBtn.disabled=true;matchHint.textContent='호스트의 시작을 기다리는 중…';}
     });
     conn.on('data',d=>{
       if(d.t==='state'){drawOpponent(d.g);opScoreEl.textContent=String(d.s).padStart(6,'0');opLinesEl.textContent=String(d.l).padStart(3,'0');}
